@@ -648,16 +648,20 @@ export class NicePayService {
 export const nicepayService = new NicePayService();
 ```
 
-### 4.2 Scheduled Jobs (Vercel Cron)
+### 4.2 Scheduled Jobs (Vercel Cron) - 최소화
+
+**Single Source of Truth 원칙**: 우리 DB가 모든 데이터의 기준이 되며, 나이스페이는 실제 출금 결과만 확인하는 용도로 사용
+
 ```typescript
-// app/api/cron/daily-payment/route.ts
+// app/api/cron/payment-result/route.ts  
+// 하루 1회만 실행 (D+1 13:00) - 실제 출금 결과만 확인
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { nicepayService } from '@/lib/nicepay/nicepay.service';
 import { format, addDays, isWeekend } from 'date-fns';
 
-// Vercel Cron: 매일 오전 10시 실행
-// vercel.json에 설정: {"crons": [{"path": "/api/cron/daily-payment", "schedule": "0 1 * * *"}]}
+// Vercel Cron: 매일 오후 1시 실행 (D+1 13:00)
+// vercel.json에 설정: {"crons": [{"path": "/api/cron/payment-result", "schedule": "0 4 * * *"}]}
 export async function GET(request: NextRequest) {
   // Vercel Cron 인증 체크
   const authHeader = request.headers.get('authorization');
@@ -677,70 +681,85 @@ export async function GET(request: NextRequest) {
     const paymentDate = format(tomorrow, 'yyyyMMdd');
     const targetDay = tomorrow.getDate();
     
-    // 1. 출금 대상자 조회
-    const targets = await prisma.cMSInfo.findMany({
+    // 1. 어제 출금 요청한 건들의 결과만 확인 (우리 DB가 Source of Truth)
+    const yesterday = addDays(today, -1);
+    const pendingPayments = await prisma.payment.findMany({
       where: {
-        paymentDay: targetDay,
-        cmsStatus: 'REGISTERED',
-        parent: {
-          serviceStatus: 'ACTIVE'
-        }
-      },
-      include: {
-        parent: {
-          include: {
-            user: true
-          }
-        }
+        requestDate: {
+          gte: new Date(yesterday.setHours(0, 0, 0, 0)),
+          lt: new Date(yesterday.setHours(23, 59, 59, 999))
+        },
+        status: 'PROCESSING'
       }
     });
     
-    // 2. 나이스페이 출금 요청
+    // 2. 나이스페이에서 실제 출금 결과만 확인
     const results = [];
-    for (const target of targets) {
-      const txId = generateTxId(); // 6자리 전문번호 생성
-      
+    for (const payment of pendingPayments) {
       try {
-        // 출금 요청
-        const response = await nicepayService.requestPayment({
-          paymentDate,
-          txId,
-          memberId: target.nicepayMemberId,
-          memberName: target.parent.user.name,
-          amount: target.monthlyAmount,
-          serviceCd: target.paymentMethod
+        // 실제 출금 성공/실패 여부만 확인
+        const result = await nicepayService.getPaymentResult({
+          paymentDate: format(payment.requestDate, 'yyyyMMdd'),
+          txId: payment.nicepayTxId
         });
         
-        // Payment 레코드 생성
-        await prisma.payment.create({
+        // 우리 DB에 결과 업데이트 (우리가 Single Source of Truth)
+        await prisma.payment.update({
+          where: { id: payment.id },
           data: {
-            parentId: target.parentId,
-            paymentMonth: format(today, 'yyyy-MM'),
-            amount: target.monthlyAmount,
-            status: 'PROCESSING',
-            nicepayTxId: txId,
-            requestDate: new Date()
+            status: result.status === 'SUCCESS' ? 'COMPLETED' : 'FAILED',
+            resultCode: result.code,
+            resultMessage: result.message,
+            processedAt: new Date()
           }
         });
         
+        // 미납 처리는 우리가 직접 관리
+        if (result.status === 'FAILED') {
+          await prisma.parent.update({
+            where: { id: payment.parentId },
+            data: {
+              overdueMonths: { increment: 1 },
+              overdueAmount: { increment: payment.amount }
+            }
+          });
+        }
+        
         results.push({ 
-          memberId: target.nicepayMemberId, 
-          status: 'success', 
-          txId 
+          paymentId: payment.id, 
+          status: result.status,
+          code: result.code
         });
       } catch (error) {
         results.push({ 
-          memberId: target.nicepayMemberId, 
-          status: 'failed', 
+          paymentId: payment.id, 
+          status: 'error', 
           error: error.message 
         });
       }
     }
     
-    // 3. 처리 결과 로깅
-    console.log('Daily payment processing completed:', {
-      date: paymentDate,
-      total: targets.length,
+    // 3. 은행 직접 해지건 확인 (하루 1회만)
+    const directCancellations = await nicepayService.getDirectCancellations({
+      date: format(yesterday, 'yyyyMMdd')
+    });
+    
+    for (const cancellation of directCancellations) {
+      await prisma.cMSInfo.update({
+        where: { nicepayMemberId: cancellation.memberId },
+        data: { 
+          cmsStatus: 'CANCELLED',
+          cancelReason: '은행 직접 해지',
+          cancelledAt: new Date()
+        }
+      });
+    }
+    
+    // 4. 처리 결과 로깅
+    console.log('Payment result check completed:', {
+      date: format(yesterday, 'yyyy-MM-dd'),
+      processed: pendingPayments.length,
+      directCancellations: directCancellations.length,
       results
     });
     

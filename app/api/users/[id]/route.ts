@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma'
 // GET: 특정 사용자 조회
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await prisma.user.findUnique({
       where: {
-        id: params.id
+        id
       }
     })
     
@@ -26,15 +27,16 @@ export async function GET(
 // PUT: 사용자 수정
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const { email, name } = body
     
     const user = await prisma.user.update({
       where: {
-        id: params.id
+        id
       },
       data: {
         email,
@@ -57,12 +59,13 @@ export async function PUT(
 // DELETE: 사용자 삭제
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     await prisma.user.delete({
       where: {
-        id: params.id
+        id
       }
     })
     

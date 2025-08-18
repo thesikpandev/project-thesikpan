@@ -1,103 +1,236 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect } from 'react'
+
+interface User {
+  id: string
+  email: string
+  name: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [users, setUsers] = useState<User[]>([])
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editName, setEditName] = useState('')
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users')
+      const data = await res.json()
+      setUsers(data)
+    } catch (err) {
+      console.error('Failed to fetch users:', err)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: name || null })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create user')
+      }
+
+      setEmail('')
+      setName('')
+      fetchUsers()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return
+
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (!res.ok) throw new Error('Failed to delete user')
+      fetchUsers()
+    } catch (err) {
+      console.error('Failed to delete user:', err)
+    }
+  }
+
+  const handleUpdate = async (id: string) => {
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: editEmail, name: editName || null })
+      })
+
+      if (!res.ok) throw new Error('Failed to update user')
+      
+      setEditingId(null)
+      fetchUsers()
+    } catch (err) {
+      console.error('Failed to update user:', err)
+    }
+  }
+
+  const startEdit = (user: User) => {
+    setEditingId(user.id)
+    setEditEmail(user.email)
+    setEditName(user.name || '')
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
+          User Management System
+        </h1>
+
+        {/* Add User Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            Add New User
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email *
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                placeholder="user@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                placeholder="John Doe"
+              />
+            </div>
+            {error && (
+              <p className="text-red-500 text-sm">{error}</p>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creating...' : 'Create User'}
+            </button>
+          </form>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Users List */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Users ({users.length})
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {users.length === 0 ? (
+              <p className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                No users yet. Create your first user above!
+              </p>
+            ) : (
+              users.map((user) => (
+                <div key={user.id} className="px-6 py-4">
+                  {editingId === user.id ? (
+                    <div className="space-y-2">
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        placeholder="Name"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleUpdate(user.id)}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {user.name || 'No Name'}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {user.email}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          Created: {new Date(user.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startEdit(user)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }

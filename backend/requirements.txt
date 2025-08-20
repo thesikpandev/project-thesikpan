@@ -1,0 +1,38 @@
+# Core
+django==5.2.5
+djangorestframework==3.16.1
+django-cors-headers==4.7.0
+python-decouple==3.8
+dj-database-url==2.3.0
+
+# Database
+psycopg2-binary==2.9.10
+
+# Celery
+celery==5.5.3
+redis==6.4.0
+django-celery-beat==2.7.0
+django-celery-results==2.5.1
+
+# Authentication
+djangorestframework-simplejwt==5.3.1
+django-allauth==66.2.0
+
+# NICEPAY Integration
+requests==2.32.3
+cryptography==44.0.0
+
+# Development
+django-debug-toolbar==5.1.0
+django-extensions==3.2.3
+ipython==8.31.0
+
+# Production
+gunicorn==23.0.0
+whitenoise==6.8.2
+
+# Testing
+pytest==8.3.4
+pytest-django==4.10.0
+factory-boy==3.3.1
+faker==33.2.1

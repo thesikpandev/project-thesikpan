@@ -1,82 +1,163 @@
-# Project TheSpikPan
+# 더식판 (TheSikpan) - Restaurant Management SaaS Platform
 
-Next.js + Vercel + Supabase + Prisma 풀스택 프로젝트
+식당 운영자를 위한 종합 관리 플랫폼
 
-## 기술 스택
+## 🏗 아키텍처
 
-- **Frontend/Backend**: Next.js 15 (App Router)
-- **Database**: Supabase (PostgreSQL)
-- **ORM**: Prisma
-- **Styling**: Tailwind CSS
-- **Deployment**: Vercel
-- **Authentication**: Supabase Auth
+- **Frontend**: Next.js 15 (App Router)
+- **Backend**: Django 5.2 + Django REST Framework
+- **Database**: PostgreSQL (개발: SQLite, 운영: AWS RDS)
+- **Cache/Queue**: Redis + Celery
+- **Payment**: NICEPAY CMS Integration
+- **Deployment**: Docker + AWS ECS + Terraform
 
-## 시작하기
+## 📁 프로젝트 구조
 
-### 1. 환경변수 설정
+```
+project-thespikpan/
+├── app/                    # Next.js Frontend
+│   ├── nicepay/           # NICEPAY 관리 UI
+│   └── api/mock/          # Mock API (개발용)
+├── backend/               # Django Backend
+│   ├── thesikpan/        # Django 프로젝트 설정
+│   ├── core/             # 공통 기능
+│   ├── accounts/         # 사용자 인증/권한
+│   ├── restaurants/      # 식당 관리
+│   └── payments/         # 결제/정산 (NICEPAY)
+├── terraform/            # Infrastructure as Code
+└── docs/                # 문서
 
-`.env.local` 파일을 생성하고 Supabase 프로젝트 정보를 입력하세요:
-
-```bash
-cp .env.example .env.local
 ```
 
-### 2. 의존성 설치
+## 🚀 시작하기
+
+### Frontend (Next.js)
 
 ```bash
+# 의존성 설치
 npm install
-```
 
-### 3. 데이터베이스 설정
-
-```bash
-# Prisma 스키마를 데이터베이스에 푸시
-npm run db:push
-
-# 또는 마이그레이션 실행
-npm run db:migrate
-```
-
-### 4. 개발 서버 실행
-
-```bash
+# 개발 서버 실행
 npm run dev
+
+# http://localhost:3000
 ```
 
-http://localhost:3000 에서 확인할 수 있습니다.
+### Backend (Django)
 
-## 프로젝트 구조
+```bash
+# Python 가상환경 설정
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
+# 의존성 설치
+pip install -r requirements.txt
+
+# 환경변수 설정
+cp .env.example .env
+
+# DB 마이그레이션
+python manage.py migrate
+
+# 슈퍼유저 생성
+python manage.py createsuperuser
+
+# 개발 서버 실행
+python manage.py runserver
+
+# http://localhost:8000
 ```
-.
-├── app/              # Next.js App Router
-├── components/       # React 컴포넌트
-├── lib/             # 유틸리티 및 라이브러리
-│   ├── supabase/    # Supabase 클라이언트
-│   └── prisma.ts    # Prisma 클라이언트
-├── prisma/          # Prisma 스키마 및 마이그레이션
-├── middleware.ts    # Next.js 미들웨어 (인증)
-└── utils/           # 유틸리티 함수
+
+### Docker (All-in-One)
+
+```bash
+# 빌드 및 실행
+docker-compose up --build
+
+# Django: http://localhost:8000
+# Next.js: http://localhost:3000
 ```
 
-## 스크립트
+## 🔑 주요 기능
 
-- `npm run dev` - 개발 서버 실행
-- `npm run build` - 프로덕션 빌드
-- `npm run start` - 프로덕션 서버 실행
-- `npm run lint` - ESLint 실행
-- `npm run db:push` - Prisma 스키마를 DB에 푸시
-- `npm run db:migrate` - Prisma 마이그레이션 실행
-- `npm run db:studio` - Prisma Studio 실행
+### 1. 식당 관리
+- 메뉴 관리
+- 영업시간 설정
+- 좌석/예약 관리
 
-## 배포
+### 2. 주문/결제
+- 온라인 주문 시스템
+- POS 연동
+- QR 주문
 
-Vercel에 배포하려면:
+### 3. 정산 자동화 (NICEPAY)
+- 자동 정산
+- 정산 내역 관리
+- 증빙 서류 관리
 
-1. Vercel에 프로젝트를 연결
-2. 환경변수 설정
-3. 배포
+### 4. 고객 관리
+- CRM
+- 리뷰 관리
+- 마케팅 자동화
 
+### 5. 분석 대시보드
+- 매출 분석
+- 고객 분석
+- 메뉴 분석
+
+## 📝 API 문서
+
+- Django Admin: http://localhost:8000/admin
+- API Docs: http://localhost:8000/api/docs
+- Mock API: http://localhost:3000/api/mock
+
+## 🔧 환경 변수
+
+### Frontend (.env.local)
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Backend (.env)
+```
+DEBUG=True
+SECRET_KEY=your-secret-key
+DATABASE_URL=sqlite:///db.sqlite3
+REDIS_URL=redis://localhost:6379
+NICEPAY_SERVICE_ID=your-service-id
+NICEPAY_API_KEY=your-api-key
+```
+
+## 📦 배포
+
+### Vercel (Frontend)
 ```bash
 vercel
 ```
+
+### AWS ECS (Backend)
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+## 📚 문서
+
+- [아키텍처 설계](backend/docs/ARCHITECTURE.md)
+- [NICEPAY 연동 가이드](docs/NICEPAY_UI_GUIDE.md)
+- [API 명세서](docs/API_SPEC.md)
+
+## 🤝 기여
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## 📄 라이선스
+
+Copyright © 2024 TheSikpan. All rights reserved.
